@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Trally — a tidy price list notepad. Add items with links and prices, get an organized sheet and export it as PDF.">
+  <title>Trally — Price List Notepad</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23161616'/%3E%3Cpath d='M9 10h14M16 10v13' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app" id="app">
+
+    <!-- ================= TOP BAR ================= -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">T</span>
+        <span class="brand-name">Trally</span>
+      </div>
+
+      <div class="list-picker">
+        <select id="listSelect" aria-label="Choose list"></select>
+        <button class="icon-btn" id="newListBtn" title="New list">＋</button>
+        <button class="icon-btn" id="renameListBtn" title="Rename list">✎</button>
+        <button class="icon-btn" id="dupListBtn" title="Duplicate list">⧉</button>
+        <button class="icon-btn" id="deleteListBtn" title="Delete list">🗑</button>
+      </div>
+
+      <div class="top-actions">
+        <span class="save-state" id="saveState" aria-live="polite">Saved</span>
+        <button class="icon-btn theme-btn" id="themeBtn" title="Theme"></button>
+        <button class="btn" id="importBtn" title="Import a Trally PDF, CSV or backup">⤒ Import</button>
+        <button class="btn btn-dark" id="pdfBtn" title="Export as PDF">⤓ Export PDF</button>
+        <div class="dropdown">
+          <button class="btn" id="moreBtn" aria-haspopup="true" aria-label="More options">⋯</button>
+          <div class="dropdown-menu" id="moreMenu">
+            <button data-action="csv">Download CSV (Excel / Sheets)</button>
+            <button data-action="copy">Copy list as text</button>
+            <hr>
+            <button data-action="json">Backup all lists (.json)</button>
+            <button data-action="import">Import PDF / CSV / backup…</button>
+            <hr>
+            <span class="menu-label">Theme</span>
+            <button data-action="theme-auto" class="theme-opt" data-theme-opt="auto">Match system</button>
+            <button data-action="theme-light" class="theme-opt" data-theme-opt="light">Light</button>
+            <button data-action="theme-dark" class="theme-opt" data-theme-opt="dark">Dark</button>
+            <hr>
+            <button data-action="clear" class="danger">Clear all items</button>
+          </div>
+        </div>
+        <input type="file" id="importFile" accept=".pdf,.csv,.json,application/pdf,text/csv,application/json" hidden>
+      </div>
+    </header>
+
+    <main class="layout">
+
+      <!-- ================= LEFT: FORM ================= -->
+      <aside class="panel form-panel">
+        <h2 id="formTitle">Add item</h2>
+        <form id="itemForm" autocomplete="off" novalidate>
+          <input type="hidden" id="editId">
+
+          <label class="field">
+            <span>Link <small>— paste it and the name fills in</small></span>
+            <input type="url" id="fLink" placeholder="https://store.com/product">
+          </label>
+
+          <label class="field">
+            <span>Item name <em>*</em></span>
+            <input type="text" id="fName" placeholder="e.g. Wireless keyboard" required>
+          </label>
+
+          <div class="row-2">
+            <label class="field">
+              <span>Price <em>*</em></span>
+              <div class="money-input">
+                <span class="cur-sym" id="curSym">€</span>
+                <input type="text" id="fPrice" placeholder="0.00" inputmode="decimal" required>
+              </div>
+            </label>
+            <label class="field">
+              <span>Qty</span>
+              <div class="qty-input">
+                <button type="button" class="qty-btn" data-step="-1" aria-label="Decrease">−</button>
+                <input type="number" id="fQty" value="1" min="1" step="1" inputmode="numeric">
+                <button type="button" class="qty-btn" data-step="1" aria-label="Increase">+</button>
+              </div>
+            </label>
+          </div>
+
+          <div class="row-2">
+            <label class="field">
+              <span>Category</span>
+              <input type="text" id="fCategory" list="categoryList" placeholder="General">
+              <datalist id="categoryList"></datalist>
+            </label>
+            <label class="field">
+              <span>Status</span>
+              <select id="fStatus">
+                <option value="planned">Planned</option>
+                <option value="bought">Bought</option>
+                <option value="maybe">Maybe</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Item note</span>
+            <input type="text" id="fNotes" placeholder="Size, color, coupon code…">
+          </label>
+
+          <div class="line-preview">
+            Line total <strong id="linePreview">€0.00</strong>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-dark btn-block" id="submitBtn">Add to list <kbd>↵</kbd></button>
+            <button type="button" class="btn btn-ghost" id="cancelEditBtn" hidden>Cancel</button>
+          </div>
+          <p class="form-error" id="formError" role="alert"></p>
+        </form>
+
+        <details class="settings" id="settingsBox" open>
+          <summary>Calculation &amp; details</summary>
+          <div class="row-2">
+            <label class="field">
+              <span>Currency</span>
+              <select id="currencySelect">
+                <option value="EUR">EUR €</option>
+                <option value="USD">USD $</option>
+                <option value="GBP">GBP £</option>
+                <option value="TRY">TRY ₺</option>
+                <option value="CHF">CHF</option>
+                <option value="JPY">JPY ¥</option>
+                <option value="CAD">CAD $</option>
+                <option value="AUD">AUD $</option>
+                <option value="SEK">SEK kr</option>
+                <option value="NOK">NOK kr</option>
+                <option value="DKK">DKK kr</option>
+                <option value="PLN">PLN zł</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Budget</span>
+              <input type="text" id="budgetInput" inputmode="decimal" placeholder="None">
+            </label>
+          </div>
+          <div class="row-3">
+            <label class="field">
+              <span>Discount %</span>
+              <input type="text" id="discountInput" inputmode="decimal" placeholder="0">
+            </label>
+            <label class="field">
+              <span>Tax / VAT %</span>
+              <input type="text" id="taxInput" inputmode="decimal" placeholder="0">
+            </label>
+            <label class="field">
+              <span>Shipping</span>
+              <input type="text" id="shippingInput" inputmode="decimal" placeholder="0">
+            </label>
+          </div>
+          <label class="field">
+            <span>Prepared by <small>— shown on the PDF</small></span>
+            <input type="text" id="preparedByInput" placeholder="Your name (optional)">
+          </label>
+          <label class="check">
+            <input type="checkbox" id="excludeMaybe">
+            <span>Leave “Maybe” items out of totals</span>
+          </label>
+        </details>
+      </aside>
+
+      <!-- ================= RIGHT: SHEET ================= -->
+      <section class="sheet-area">
+
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-label">Grand total</span>
+            <span class="stat-value" id="statTotal">€0.00</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Items</span>
+            <span class="stat-value" id="statCount">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Most expensive</span>
+            <span class="stat-value" id="statMax">—</span>
+            <span class="stat-sub" id="statMaxName"></span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Bought / remaining</span>
+            <span class="stat-value small" id="statBought">€0.00 / €0.00</span>
+          </div>
+        </div>
+
+        <div class="budget-bar" id="budgetBar" hidden>
+          <div class="budget-track"><div class="budget-fill" id="budgetFill"></div></div>
+          <span id="budgetText"></span>
+        </div>
+
+        <div class="panel sheet-panel">
+          <div class="toolbar">
+            <div class="search">
+              <span>⌕</span>
+              <input type="search" id="searchInput" placeholder="Search items, notes, links…">
+            </div>
+            <select id="filterCategory" aria-label="Filter by category">
+              <option value="">All categories</option>
+            </select>
+            <select id="filterStatus" aria-label="Filter by status">
+              <option value="">All statuses</option>
+              <option value="planned">Planned</option>
+              <option value="bought">Bought</option>
+              <option value="maybe">Maybe</option>
+            </select>
+            <select id="sortSelect" class="mobile-only" aria-label="Sort">
+              <option value="">Order added</option>
+              <option value="name:1">Name A–Z</option>
+              <option value="total:-1">Total high–low</option>
+              <option value="total:1">Total low–high</option>
+              <option value="price:-1">Price high–low</option>
+              <option value="category:1">Category</option>
+              <option value="status:1">Status</option>
+            </select>
+            <label class="check compact">
+              <input type="checkbox" id="groupToggle">
+              <span>Group by category</span>
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table class="sheet" id="sheet">
+              <thead>
+                <tr>
+                  <th class="col-num">#</th>
+                  <th data-sort="name" class="sortable">Item</th>
+                  <th data-sort="category" class="sortable c-cat">Category</th>
+                  <th>Link</th>
+                  <th data-sort="status" class="sortable">Status</th>
+                  <th data-sort="price" class="sortable num">Price</th>
+                  <th data-sort="qty" class="sortable num">Qty</th>
+                  <th data-sort="total" class="sortable num">Total</th>
+                  <th class="col-actions"></th>
+                </tr>
+              </thead>
+              <tbody id="sheetBody"></tbody>
+              <tfoot id="sheetFoot"></tfoot>
+            </table>
+
+            <div class="empty" id="emptyState"></div>
+          </div>
+        </div>
+
+        <div class="lower">
+          <div class="panel notepad-panel">
+            <div class="notepad-head">
+              <h3>Notepad</h3>
+              <label class="check compact">
+                <input type="checkbox" id="notepadInPdf" checked>
+                <span>Add to bottom of PDF</span>
+              </label>
+            </div>
+            <textarea id="notepad" placeholder="Write anything here — delivery dates, who pays what, things to compare…"></textarea>
+            <div class="notepad-foot"><span id="notepadCount">0 characters</span></div>
+          </div>
+
+          <div class="panel breakdown-panel" id="breakdownPanel">
+            <h3>By category</h3>
+            <div id="breakdown"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= SITE FOOTER ================= -->
+    <footer class="site-footer">
+      <div class="sf-left">
+        <span class="logo small">T</span>
+        <span><strong>Trally</strong> · the tidy price list</span>
+      </div>
+      <div class="sf-mid desktop-hint">
+        <kbd>/</kbd> search · <kbd>N</kbd> new item · <kbd>Esc</kbd> cancel · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo delete
+      </div>
+      <div class="sf-right">
+        <span id="madeBy"></span> · © <span id="year"></span> · Your data stays in this browser
+      </div>
+    </footer>
+  </div>
+
+  <!-- ================= PDF REPORT (print only) ================= -->
+  <div class="report" id="report" aria-hidden="true"></div>
+
+  <!-- ================= TOAST ================= -->
+  <div class="toast" id="toast" role="status"><span id="toastMsg"></span><button id="toastAction"></button></div>
+
+  <!-- ================= GENERIC MODAL ================= -->
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h3 id="modalTitle"></h3>
+      <p id="modalText"></p>
+      <input type="text" id="modalInput" hidden>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <!-- ================= PDF OPTIONS ================= -->
+  <div class="modal-backdrop" id="pdfModal" hidden>
+    <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="pdfModalTitle">
+      <h3 id="pdfModalTitle">Export PDF</h3>
+      <label class="field">
+        <span>Title</span>
+        <input type="text" id="pdfTitle">
+      </label>
+      <div class="opt-grid">
+        <label class="check"><input type="checkbox" id="optSummary"> <span>Summary bar</span></label>
+        <label class="check"><input type="checkbox" id="optLinks"> <span>Full links (not just site name)</span></label>
+        <label class="check"><input type="checkbox" id="optStatus"> <span>Status column</span></label>
+        <label class="check"><input type="checkbox" id="optItemNotes"> <span>Item notes</span></label>
+        <label class="check"><input type="checkbox" id="optNotepad"> <span>Notepad at the bottom</span></label>
+        <label class="check"><input type="checkbox" id="optLandscape"> <span>Landscape page</span></label>
+      </div>
+      <p class="hint">The PDF also stores your list invisibly, so you can import it back into Trally later. In the print window choose <strong>Save as PDF</strong>.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="pdfCancel">Cancel</button>
+        <button class="btn btn-dark" id="pdfGo">⤓ Export PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drag & drop overlay -->
+  <div class="drop-overlay" id="dropOverlay" hidden>
+    <div><strong>Drop to import</strong><span>Trally PDF, CSV or backup file</span></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
